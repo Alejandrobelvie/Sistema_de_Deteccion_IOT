@@ -2,7 +2,7 @@
 Configuración de base de datos encriptada con SQLCipher
 SQLite + AES-256 encryption
 """
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import sessionmaker, declarative_base
 from app.core.config import settings
 import structlog
@@ -87,7 +87,7 @@ def verify_db_encryption():
     """
     db = SessionLocal()
     try:
-        result = db.execute("PRAGMA cipher_version")
+        result = db.execute(text("PRAGMA cipher_version"))
         version = result.fetchone()[0]
         
         if version:

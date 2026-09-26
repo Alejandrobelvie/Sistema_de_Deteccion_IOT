@@ -1,12 +1,12 @@
 """
 Endpoints de autenticación (login, registro, JWT)
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Request
-from fastapi.security import OAuth2PasswordRequestForm
+from fastapi import APIRouter, Depends, Header, HTTPException, status, Request
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from datetime import timedelta
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 import structlog
+import secrets
 
 from app.db.database import get_db
 from app.db import models
@@ -22,6 +22,7 @@ from app.core.security import (
 logger = structlog.get_logger()
 
 router = APIRouter()
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 
 # --------------------------------------------
@@ -36,8 +37,12 @@ class TokenResponse(BaseModel):
 class UserCreate(BaseModel):
     email: EmailStr
     username: str
-    password: str
-    full_name: str
+    password: str = Field(min_length=12, max_length=128)
+    full_name: str = Field(min_length=1, max_length=255)
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
 
 
 class UserResponse(BaseModel):
@@ -57,11 +62,22 @@ class UserResponse(BaseModel):
 @router.post("/register", response_model=UserResponse, status_code=201)
 async def register(
     user_data: UserCreate,
+    bootstrap_token: str = Header(..., alias="X-Bootstrap-Token"),
     db: Session = Depends(get_db)
 ):
     """
-    Registro de nuevo usuario administrador
+    Registra el primer administrador. Después del bootstrap, la ruta se cierra.
     """
+    from app.core.config import settings
+
+    if not secrets.compare_digest(bootstrap_token, settings.BOOTSTRAP_TOKEN):
+        raise HTTPException(status_code=401, detail="Token de bootstrap inválido")
+    if db.query(models.User).first() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="El registro público está cerrado"
+        )
+
     # Verificar si el email ya existe
     existing_user = db.query(models.User).filter(
         models.User.email == user_data.email
@@ -115,7 +131,7 @@ async def login(
     Retorna access token y refresh token
     """
     # Rate limiting
-    client_ip = request.client.host
+    client_ip = request.client.host if request.client else "unknown"
     
     if login_rate_limiter.is_locked_out(client_ip):
         logger.warning("IP bloqueada por rate limiting", ip=client_ip)
@@ -156,6 +172,8 @@ async def login(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Usuario inactivo"
         )
+
+    login_rate_limiter.reset(client_ip)
     
     # Crear tokens
     access_token = create_access_token(
@@ -177,13 +195,13 @@ async def login(
 
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh_token(
-    refresh_token: str,
+    request: RefreshRequest,
     db: Session = Depends(get_db)
 ):
     """
     Refresca access token usando refresh token
     """
-    payload = verify_token(refresh_token, token_type="refresh")
+    payload = verify_token(request.refresh_token, token_type="refresh")
     
     if not payload:
         raise HTTPException(
@@ -207,14 +225,16 @@ async def refresh_token(
     
     return {
         "access_token": new_access_token,
-        "refresh_token": refresh_token,  # Mismo refresh token
+        "refresh_token": create_refresh_token(
+            data={"sub": str(user.id), "email": user.email}
+        ),
         "token_type": "bearer"
     }
 
 
 @router.get("/me", response_model=UserResponse)
 async def get_current_user(
-    token: str = Depends(OAuth2PasswordRequestForm),
+    token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db)
 ):
     """
@@ -231,7 +251,7 @@ async def get_current_user(
     user_id = int(payload["sub"])
     user = db.query(models.User).filter(models.User.id == user_id).first()
     
-    if not user:
+    if not user or not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Usuario no encontrado"

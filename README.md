@@ -6,9 +6,10 @@ source venv/bin/activate  # Linux/Mac
 pip install -r requirements.txt
 
 # 3. Configurar .env
-cp .env.example .env
+cp env.example.env .env
 # Editar .env y agregar claves generadas con:
 openssl rand -hex 32  # Para SECRET_KEY
+openssl rand -hex 32  # Para BOOTSTRAP_TOKEN
 openssl rand -hex 32  # Para DATABASE_ENCRYPTION_KEY
 
 # 4. Inicializar DB

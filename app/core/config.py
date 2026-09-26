@@ -2,16 +2,19 @@
 Configuración centralizada de la aplicación
 Todas las variables de entorno se cargan desde aquí
 """
-from pydantic_settings import BaseSettings
+from pydantic import field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List
 from functools import lru_cache
 
 
 class Settings(BaseSettings):
     """Configuración de seguridad y aplicación"""
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="ignore")
     
     # JWT y Autenticación
     SECRET_KEY: str
+    BOOTSTRAP_TOKEN: str
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
@@ -78,9 +81,30 @@ class Settings(BaseSettings):
         """Retorna lista de orígenes CORS permitidos"""
         return [o.strip() for o in self.CORS_ORIGINS.split(",")]
     
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    @field_validator("SECRET_KEY", "BOOTSTRAP_TOKEN")
+    @classmethod
+    def validate_secret_key(cls, value: str) -> str:
+        if len(value) < 32:
+            raise ValueError("Los secretos de autenticación deben tener al menos 32 caracteres")
+        return value
+
+    @field_validator("DATABASE_ENCRYPTION_KEY")
+    @classmethod
+    def validate_database_key(cls, value: str) -> str:
+        if len(value) != 64:
+            raise ValueError("DATABASE_ENCRYPTION_KEY debe tener 64 caracteres hexadecimales")
+        try:
+            bytes.fromhex(value)
+        except ValueError as exc:
+            raise ValueError("DATABASE_ENCRYPTION_KEY debe ser hexadecimal") from exc
+        return value
+
+    @field_validator("ALGORITHM")
+    @classmethod
+    def validate_algorithm(cls, value: str) -> str:
+        if value != "HS256":
+            raise ValueError("Solo se admite HS256 con la configuración actual")
+        return value
 
 
 @lru_cache()

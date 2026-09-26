@@ -2,7 +2,7 @@
 Modelos de base de datos (SQLAlchemy ORM)
 Todos los datos sensibles están encriptados
 """
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, ForeignKey, LargeBinary
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, ForeignKey, LargeBinary, Float
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.db.database import Base

@@ -109,7 +109,7 @@ pip install face_recognition --no-cache-dir
 
 ```bash
 # Copiar archivo de ejemplo
-cp .env.example .env
+cp env.example.env .env
 
 # Generar claves seguras
 # SECRET_KEY (32 bytes = 64 caracteres hex)
@@ -152,10 +152,7 @@ INICIALIZANDO BASE DE DATOS
 ============================================================
 ✅ Base de datos encriptada: 4.5.0
 ✅ Tablas creadas exitosamente
-⚠️  USUARIO ADMIN CREADO
-Email: admin@empresa.com
-Password: Admin123!@#
-⚠️  CAMBIA LA CONTRASEÑA INMEDIATAMENTE
+Registra el primer administrador mediante POST /api/auth/register
 ```
 
 ---
@@ -233,15 +230,13 @@ npm run dev
 
 ---
 
-## Paso 10: Probar Login
+## Paso 10: Crear el administrador y probar login
 
 1. Abre `http://localhost:8000/docs` (Swagger UI)
-2. Endpoint `/api/auth/login`
-3. Click en "Try it out"
-4. Username: `admin@empresa.com`
-5. Password: `Admin123!@#` (o la que hayas configurado)
-6. Click "Execute"
-7. Deberías recibir un JWT token
+2. Usa `/api/auth/register` con el header `X-Bootstrap-Token` configurado en `.env`.
+3. El endpoint solo permite crear el primer usuario; los siguientes se crean desde `/api/users` por un administrador.
+4. Inicia sesión en `/api/auth/login` con el email y contraseña recién creados.
+5. Deberías recibir tokens JWT de acceso y renovación.
 
 ---
 

@@ -2,13 +2,15 @@
 Módulo de seguridad: JWT, bcrypt, encriptación
 Implementa las mejores prácticas de seguridad para 2026
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from cryptography.fernet import Fernet
 import hashlib
 import hmac
+import base64
+import secrets
 import structlog
 
 from app.core.config import settings
@@ -50,11 +52,11 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     to_encode = data.copy()
     
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     
-    to_encode.update({"exp": expire, "type": "access"})
+    to_encode.update({"exp": expire, "type": "access", "jti": secrets.token_urlsafe(16)})
     
     encoded_jwt = jwt.encode(
         to_encode,
@@ -71,9 +73,9 @@ def create_refresh_token(data: dict) -> str:
     Crea un JWT refresh token (larga duración)
     """
     to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+    expire = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
     
-    to_encode.update({"exp": expire, "type": "refresh"})
+    to_encode.update({"exp": expire, "type": "refresh", "jti": secrets.token_urlsafe(16)})
     
     encoded_jwt = jwt.encode(
         to_encode,
@@ -130,13 +132,16 @@ class BiometricEncryption:
         """
         Inicializa con clave de encriptación (64 caracteres hex)
         """
-        # Validar longitud de clave (256 bits = 64 hex chars)
         if len(encryption_key) != 64:
             raise ValueError("La clave de encriptación debe ser de 64 caracteres hex (256 bits)")
+        try:
+            bytes.fromhex(encryption_key)
+        except ValueError as exc:
+            raise ValueError("La clave de encriptación debe contener solo caracteres hexadecimales") from exc
         
         # Derivar clave Fernet desde la clave maestra
-        key_material = hashlib.sha256(encryption_key.encode()).digest()
-        self.cipher = Fernet(key_material)
+        key_material = hashlib.sha256(bytes.fromhex(encryption_key)).digest()
+        self.cipher = Fernet(base64.urlsafe_b64encode(key_material))
         logger.info("Sistema de encriptación biométrica inicializado")
     
     def encrypt_biometric_template(self, template_bytes: bytes) -> str:
@@ -169,7 +174,7 @@ def compute_log_hash(log_entry: str, previous_hash: str = "") -> str:
     Computa hash SHA-256 para integridad de logs
     Cada log incluye el hash del anterior (blockchain-like)
     """
-    data = f"{previous_hash}{log_entry}{datetime.utcnow().isoformat()}"
+    data = f"{previous_hash}{log_entry}"
     return hashlib.sha256(data.encode()).hexdigest()
 
 
@@ -225,7 +230,7 @@ class RateLimiter:
         
         self.attempts[identifier].append(now)
         
-        if len(self.attempts[identifier]) > self.max_attempts:
+        if len(self.attempts[identifier]) >= self.max_attempts:
             self.lockouts[identifier] = now + self.lockout_duration
             logger.warning(
                 "Rate limit excedido, usuario bloqueado",
@@ -235,6 +240,11 @@ class RateLimiter:
             return True
         
         return False
+
+    def reset(self, identifier: str) -> None:
+        """Limpia intentos después de una autenticación correcta."""
+        self.attempts.pop(identifier, None)
+        self.lockouts.pop(identifier, None)
 
 
 # Instancia global de encriptación biometrica

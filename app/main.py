@@ -2,15 +2,17 @@
 Sistema de Control de Acceso Biométrico IoT
 Punto de entrada principal de la aplicación FastAPI
 """
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import OAuth2PasswordBearer
 from contextlib import asynccontextmanager
 import structlog
 
 from app.core.config import settings
 from app.api import auth, users, access, dashboard, logs
 from app.db.database import init_db
+from app.db.database import get_db
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 # Configuración de logging estructurado
 structlog.configure(
@@ -56,7 +58,7 @@ app = FastAPI(
 # Configuración de CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=settings.get_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -86,9 +88,13 @@ async def root():
 
 
 @app.get("/health", tags=["Health"])
-async def health_check():
+async def health_check(db: Session = Depends(get_db)):
     """Verificación de estado para monitoreo"""
-    return {"status": "ok"}
+    try:
+        db.execute(text("SELECT 1"))
+    except Exception:
+        raise HTTPException(status_code=503, detail="database unavailable")
+    return {"status": "ok", "database": "ok"}
 
 
 if __name__ == "__main__":

@@ -138,7 +138,8 @@ class FaceRecognitionService:
         # Detectar rostros
         face_locations = self.detect_faces(image)
         
-        if len(face_locations) == 0:
+        if len(face_locations) != 1:
+            logger.warning("Se requiere exactamente un rostro", count=len(face_locations))
             return None
         
         # Asumir un solo rostro por ahora
@@ -150,21 +151,30 @@ class FaceRecognitionService:
         if unknown_encoding is None:
             return None
         
-        # Comparar con todos los conocidos
-        for i, known_encoding in enumerate(known_encodings):
-            if self.compare_faces(known_encoding, unknown_encoding):
-                logger.info(
-                    "Reconocimiento exitoso",
-                    person_id=known_ids[i],
-                    confidence="high"
-                )
-                
-                return {
-                    "person_id": known_ids[i],
-                    "confidence": 1.0,  # Podríamos calcular score más preciso
-                    "face_location": face_location,
-                    "timestamp": datetime.utcnow().isoformat()
-                }
+        if not known_encodings or len(known_encodings) != len(known_ids):
+            return None
+
+        distances = face_recognition.face_distance(known_encodings, unknown_encoding)
+        best_index = int(np.argmin(distances))
+        best_distance = float(distances[best_index])
+        if best_distance < self.tolerance:
+            liveness = self.detect_liveness(image, face_location)
+            if not liveness["is_live"]:
+                logger.warning("Reconocimiento rechazado por liveness", reason=liveness.get("reason"))
+                return None
+            logger.info(
+                "Reconocimiento exitoso",
+                person_id=known_ids[best_index],
+                distance=round(best_distance, 4),
+            )
+            return {
+                "person_id": known_ids[best_index],
+                "confidence": max(0.0, min(1.0, 1.0 - best_distance)),
+                "distance": best_distance,
+                "face_location": face_location,
+                "liveness": liveness,
+                "timestamp": datetime.utcnow().isoformat()
+            }
         
         logger.info("Rostro no reconocido")
         return None
@@ -186,39 +196,14 @@ class FaceRecognitionService:
         if not self.liveness_enabled:
             return {"is_live": True, "method": "disabled"}
         
-        top, right, bottom, left = face_location
-        face_roi = image[top:bottom, left:right]
-        
-        # 1. Detección de parpadeo (blink detection)
-        blink_score = self._detect_blink(face_roi)
-        
-        # 2. Análisis de textura (screen/photo detection)
-        texture_score = self._analyze_texture(face_roi)
-        
-        # 3. Detección de profundidad (si hay cámara RGB-D)
-        depth_score = self._analyze_depth(face_roi)
-        
-        # Calcular score final
-        liveness_score = (blink_score + texture_score + depth_score) / 3
-        
-        is_live = liveness_score > settings.LIVENESS_BLINK_THRESHOLD
-        
-        logger.info(
-            "Liveness detection completado",
-            is_live=is_live,
-            score=round(liveness_score, 3),
-            blink=round(blink_score, 3),
-            texture=round(texture_score, 3),
-            depth=round(depth_score, 3)
-        )
-        
+        # Una imagen aislada no puede demostrar parpadeo o movimiento. Aceptarla
+        # como prueba de vida permitiría usar una fotografía. Se rechaza hasta
+        # integrar una secuencia temporal o un sensor de profundidad real.
+        logger.warning("Liveness no disponible para imagen única; acceso rechazado")
         return {
-            "is_live": is_live,
-            "liveness_score": liveness_score,
-            "blink_score": blink_score,
-            "texture_score": texture_score,
-            "depth_score": depth_score,
-            "timestamp": datetime.utcnow().isoformat()
+            "is_live": False,
+            "reason": "temporal_liveness_required",
+            "timestamp": datetime.utcnow().isoformat(),
         }
     
     def _detect_blink(self, face_roi: np.ndarray) -> float:
@@ -226,25 +211,19 @@ class FaceRecognitionService:
         Detecta parpadeo analizando ojos
         Implementación simplificada - en producción usar modelo especializado
         """
-        # En producción: usar dlib facial landmarks + EAR (Eye Aspect Ratio)
-        # Esto es un placeholder
-        return 0.7  # Simulado
+        raise NotImplementedError("El parpadeo requiere una secuencia temporal")
     
     def _analyze_texture(self, face_roi: np.ndarray) -> float:
         """
         Analiza textura de piel para detectar pantallas/fotos
         """
-        # En producción: usar LBP (Local Binary Patterns) o CNN
-        # Esto es un placeholder
-        return 0.8  # Simulado
+        raise NotImplementedError("Se requiere un modelo anti-spoofing validado")
     
     def _analyze_depth(self, face_roi: np.ndarray) -> float:
         """
         Analiza profundidad (requiere cámara RGB-D o stereo)
         """
-        # En producción: usar información de profundidad
-        # Esto es un placeholder
-        return 0.7  # Simulado
+        raise NotImplementedError("Se requiere un sensor de profundidad")
     
     def capture_enrollment_images(
         self,
@@ -320,21 +299,24 @@ class FaceRecognitionService:
         for i, image in enumerate(images):
             face_locations = self.detect_faces(image)
             
-            if len(face_locations) == 0:
-                logger.warning(f"No se detectó rostro en imagen {i+1}")
-                continue
+            if len(face_locations) != 1:
+                logger.warning("Imagen de enrollment inválida", image=i + 1, faces=len(face_locations))
+                return None
             
             encoding = self.encode_face(image, face_locations[0])
             
             if encoding is not None:
                 encodings.append(encoding)
         
-        if len(encodings) == 0:
+        if len(encodings) != len(images):
             logger.error("No se pudieron generar encodings")
             return None
         
         # Promediar todos los encodings
         avg_encoding = np.mean(encodings, axis=0)
+        if any(np.linalg.norm(encoding - avg_encoding) >= self.tolerance for encoding in encodings):
+            logger.warning("Las imágenes de enrollment no corresponden consistentemente al mismo rostro")
+            return None
         
         logger.info(
             "Plantilla biométrica generada",
