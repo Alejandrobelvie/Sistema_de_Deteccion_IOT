@@ -1,4 +1,4 @@
-# 📖 Guía de Instalación Detallada
+# Guía de Instalación Detallada
 
 ## Paso 1: Preparar el Sistema
 
@@ -150,8 +150,8 @@ python -m app.db.init_db
 ============================================================
 INICIALIZANDO BASE DE DATOS
 ============================================================
-✅ Base de datos encriptada: 4.5.0
-✅ Tablas creadas exitosamente
+ Base de datos encriptada: 4.5.0
+ Tablas creadas exitosamente
 Registra el primer administrador mediante POST /api/auth/register
 ```
 
@@ -240,7 +240,7 @@ npm run dev
 
 ---
 
-## 🔧 Solución de Problemas Comunes
+## Solución de Problemas Comunes
 
 ### Error: "No module named 'face_recognition'"
 
@@ -290,7 +290,7 @@ Verificar que `SECRET_KEY` en `.env` tenga exactamente 64 caracteres hex.
 
 ---
 
-## 📊 Verificación Final
+## Verificación Final
 
 Ejecuta este script de verificación:
 
@@ -299,18 +299,18 @@ python scripts/verify_installation.py
 ```
 
 **Checklist:**
-- ✅ Python 3.10+ instalado
-- ✅ Entorno virtual activo
-- ✅ Todas las dependencias instaladas
-- ✅ Base de datos encriptada creada
-- ✅ Usuario admin creado
-- ✅ Cámara detectada
-- ✅ Servidor inicia sin errores
-- ✅ Login funciona con JWT
+- Python 3.10+ instalado
+- Entorno virtual activo
+- Todas las dependencias instaladas
+- Base de datos encriptada creada
+- Usuario admin creado
+- Cámara detectada
+- Servidor inicia sin errores
+- Login funciona con JWT
 
 ---
 
-## 🚀 Siguientes Pasos
+## Siguientes Pasos
 
 1. **Cambiar contraseña de admin** inmediatamente
 2. **Configurar HTTPS** para producción
@@ -321,7 +321,7 @@ python scripts/verify_installation.py
 
 ---
 
-## 📞 Soporte
+## Soporte
 
 Si tienes problemas:
 1. Revisa los logs en `logs/audit.log`
