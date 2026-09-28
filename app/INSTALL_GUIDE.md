@@ -1,335 +1,291 @@
-# Guía de Instalación Detallada
+# Installation Guide
 
-## Paso 1: Preparar el Sistema
+This guide installs the current FastAPI backend on Fedora, Ubuntu/Debian, or Windows. Python 3.12 is recommended because the project depends on native packages such as `dlib`, `face_recognition`, and `sqlcipher3`.
 
-### Ubuntu/Debian
+The repository does not currently contain a complete web frontend. After installation, use the API through Swagger UI at `http://127.0.0.1:8000/docs`.
+
+## Fedora
+
+### Install system dependencies
 
 ```bash
-# Actualizar sistema
-sudo apt update && sudo apt upgrade -y
-
-# Instalar dependencias del sistema
-sudo apt install -y python3.10 python3.10-venv python3-pip \
-    cmake build-essential git curl \
-    libopenblas-dev liblapack-dev libx11-dev libgtk-3-dev \
-    libboost-python-dev libsqlcipher-dev sqlcipher \
-    libjpeg-dev libpng-dev libtiff-dev
-
-# Verificar versiones
-python3 --version  # Debe ser 3.10+
-cmake --version
+sudo dnf install -y \
+  python3.12 python3.12-devel \
+  gcc gcc-c++ make cmake git openssl \
+  openblas-devel lapack-devel \
+  libX11-devel gtk3-devel boost-devel \
+  sqlcipher sqlcipher-devel \
+  libjpeg-turbo-devel libpng-devel libtiff-devel
 ```
 
-### Fedora
+Then, from the repository root:
 
 ```bash
-sudo dnf install -y python3.10 python3.10-devel cmake gcc gcc-c++ \
-    git curl openblas-devel lapack-devel libX11-devel gtk3-devel \
-    boost-devel sqlcipher-devel sqlcipher \
-    libjpeg-turbo-devel libpng-devel libtiff-devel
+python3.12 --version
+python3.12 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install -r requirements.txt
+python -m pip install email-validator
 ```
 
-### Windows
+Package installation can take several minutes because `dlib` may compile locally.
 
-1. **Instalar Python 3.10+** desde [python.org](https://www.python.org/downloads/)
-2. **Instalar Visual Studio Build Tools**:
-   - Descargar desde [Microsoft](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
-   - Seleccionar "Desktop Development with C++"
-3. **Instalar CMake**:
-   - Descargar desde [cmake.org](https://cmake.org/download/)
-   - Agregar al PATH del sistema
-4. **Instalar Git** desde [git-scm.com](https://git-scm.com/)
+## Ubuntu and Debian
 
----
-
-## Paso 2: Clonar el Proyecto
+Ubuntu 24.04 provides Python 3.12 as its default Python. On another release, install a supported Python 3.12 package for that release before continuing.
 
 ```bash
-# Crear directorio de proyecto
-mkdir -p ~/projects/facial-access-iot
-cd ~/projects/facial-access-iot
-
-# Clonar repositorio (o copiar archivos)
-git clone <tu-repositorio> .
-# O copiar archivos manualmente
+sudo apt update
+sudo apt install -y \
+  python3 python3-venv python3-dev \
+  build-essential cmake git openssl pkg-config \
+  libopenblas-dev liblapack-dev \
+  libx11-dev libgtk-3-dev libboost-python-dev \
+  libsqlcipher-dev sqlcipher \
+  libjpeg-dev libpng-dev libtiff-dev
 ```
 
----
-
-## Paso 3: Configurar Entorno Virtual
+Confirm that `python3 --version` reports Python 3.12, then create the environment:
 
 ```bash
-# Crear entorno virtual
-python3 -m venv venv
-
-# Activar entorno
-# Linux/Mac:
-source venv/bin/activate
-
-# Windows:
-venv\Scripts\activate
-
-# Verificar que está activo
-which python  # Linux/Mac
-# o
-where python  # Windows
+python3 --version
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install -r requirements.txt
+python -m pip install email-validator
 ```
 
----
+## Windows
 
-## Paso 4: Instalar Dependencias de Python
+WSL2 with Ubuntu is the recommended Windows setup. It provides the Linux development libraries expected by `sqlcipher3` and `dlib` and follows the same commands used in deployment.
 
-```bash
-# Actualizar pip
-pip install --upgrade pip
+### WSL2 with Ubuntu (recommended)
 
-# Instalar todas las dependencias
-pip install -r requirements.txt
+Open PowerShell as Administrator and run:
 
-# Esto puede tomar 10-20 minutos la primera vez
-# Se descargarán: OpenCV, dlib, face_recognition, YOLOv8, etc.
+```powershell
+wsl --install -d Ubuntu
 ```
 
-### Si hay errores con dlib:
+Restart Windows if requested, open Ubuntu, and finish creation of the Linux user. Clone or copy the repository into the WSL filesystem—for example, under `~/projects`—for better build performance. Then follow the **Ubuntu and Debian** section above.
 
-```bash
-# Asegurar tener CMake y compiladores
-sudo apt install cmake build-essential
+From Windows, the running API remains available at `http://127.0.0.1:8000/docs`.
 
-# Reintentar instalación de dlib
-pip install dlib --no-cache-dir
+### Native Windows (advanced)
 
-# Luego el resto
-pip install face_recognition --no-cache-dir
+Native installation is possible, but compilation of `dlib` and `sqlcipher3` depends on the available compiler and SQLCipher libraries.
+
+Install:
+
+1. 64-bit Python 3.12 from <https://www.python.org/downloads/> and enable **Add Python to PATH**.
+2. Git from <https://git-scm.com/download/win>.
+3. CMake from <https://cmake.org/download/> and add it to `PATH`.
+4. Visual Studio Build Tools from <https://visualstudio.microsoft.com/visual-cpp-build-tools/> with **Desktop development with C++** and a Windows SDK.
+5. A native SQLCipher development build discoverable by the compiler and linker.
+
+In PowerShell, from the repository root:
+
+```powershell
+py -3.12 -m venv .venv
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install -r requirements.txt
+python -m pip install email-validator
 ```
 
----
+If `sqlcipher3` cannot compile or load its DLLs, use WSL2. Do not replace SQLCipher with ordinary SQLite for biometric production data.
 
-## Paso 5: Configurar Variables de Entorno
+## Configure the application
+
+Perform these steps after completing the platform-specific installation.
+
+### Create `.env`
+
+Linux or WSL:
 
 ```bash
-# Copiar archivo de ejemplo
 cp env.example.env .env
-
-# Generar claves seguras
-# SECRET_KEY (32 bytes = 64 caracteres hex)
-openssl rand -hex 32
-
-# DATABASE_ENCRYPTION_KEY (32 bytes = 64 caracteres hex)
-openssl rand -hex 32
-
-# Editar .env y pegar las claves generadas
-nano .env  # o usa tu editor favorito
 ```
 
-### .env mínimo requerido:
+Windows PowerShell:
+
+```powershell
+Copy-Item env.example.env .env
+```
+
+Generate three independent 32-byte secrets.
+
+Linux or WSL:
+
+```bash
+openssl rand -hex 32
+openssl rand -hex 32
+openssl rand -hex 32
+```
+
+Native Windows PowerShell, if OpenSSL is unavailable:
+
+```powershell
+python -c "import secrets; print(secrets.token_hex(32))"
+python -c "import secrets; print(secrets.token_hex(32))"
+python -c "import secrets; print(secrets.token_hex(32))"
+```
+
+Place a different generated value in each field:
 
 ```env
-SECRET_KEY=tu_clave_de_64_caracteres_hex_aqui
-DATABASE_ENCRYPTION_KEY=tu_clave_de_64_caracteres_hex_aqui
-ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=30
-DATABASE_URL=sqlite+sqlcipher:///./secure.db
-CAMERA_INDEX=0
+SECRET_KEY=<first-generated-value>
+BOOTSTRAP_TOKEN=<second-generated-value>
+DATABASE_ENCRYPTION_KEY=<third-generated-value>
 ```
 
----
+Also update the database dialect and disable application-managed TLS for local development:
 
-## Paso 6: Inicializar Base de Datos
+```env
+DATABASE_URL=sqlite+pysqlcipher:///./secure.db
+TLS_ENABLED=false
+```
+
+`DATABASE_ENCRYPTION_KEY` must contain exactly 64 hexadecimal characters. `SECRET_KEY` and `BOOTSTRAP_TOKEN` must contain at least 32 characters.
+
+### Initialize SQLCipher
+
+With the virtual environment active, run from the repository root:
 
 ```bash
-# Asegurar que el entorno está activo
-source venv/bin/activate
-
-# Ejecutar script de inicialización
 python -m app.db.init_db
 ```
 
-**Deberías ver:**
-```
-============================================================
-INICIALIZANDO BASE DE DATOS
-============================================================
- Base de datos encriptada: 4.5.0
- Tablas creadas exitosamente
-Registra el primer administrador mediante POST /api/auth/register
-```
+A successful result reports a SQLCipher version and creates `secure.db`.
 
----
-
-## Paso 7: Probar el Backend
+### Start the API
 
 ```bash
-# Iniciar servidor
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-
-# Deberías ver:
-# INFO:     Uvicorn running on http://0.0.0.0:8000
-# INFO:     Aplicación iniciada correctamente
+python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-### Verificar que funciona:
+Keep that terminal open. Visit:
 
-Abre tu navegador en: `http://localhost:8000`
+- <http://127.0.0.1:8000/> for application status
+- <http://127.0.0.1:8000/health> for the database health check
+- <http://127.0.0.1:8000/docs> for Swagger UI
 
-Deberías ver la documentación Swagger de FastAPI.
+The root URL returns JSON; the interactive documentation is at `/docs`.
 
-Prueba el endpoint de salud:
+### Create the first administrator
+
+1. Open `http://127.0.0.1:8000/docs`.
+2. Expand `POST /api/auth/register` and select **Try it out**.
+3. Enter the `.env` value of `BOOTSTRAP_TOKEN` in `X-Bootstrap-Token`.
+4. Enter the administrator details. The password must contain at least 12 characters.
+5. Execute the request. Only the first user can be created through this endpoint.
+6. Use `POST /api/auth/login`. Enter the administrator email in the OAuth `username` field.
+7. Copy the access token and use Swagger UI's **Authorize** button for protected routes.
+
+## Verify the installation
+
+In a second terminal, activate the environment and run:
+
 ```bash
-curl http://localhost:8000/health
-# Response: {"status":"ok"}
+curl http://127.0.0.1:8000/health
+python -m pytest tests -v
 ```
 
----
+PowerShell can use:
 
-## Paso 8: Probar Reconocimiento Facial
-
-```bash
-# Script de prueba de cámara
-python scripts/test_camera.py
+```powershell
+Invoke-RestMethod http://127.0.0.1:8000/health
+python -m pytest tests -v
 ```
 
-**Deberías ver:**
-- Ventana con feed de cámara
-- Detección de rostros en tiempo real
-- Mensajes en consola cuando detecta rostros
+The expected health response is:
 
-**Si no funciona:**
-```bash
-# Verificar que la cámara está disponible
-ls /dev/video*  # Linux
-# o
-python -c "import cv2; print(cv2.getBuildInformation())"
-
-# Probar con diferente índice de cámara
-# Cambiar CAMERA_INDEX=1 en .env
+```json
+{"status":"ok","database":"ok"}
 ```
 
----
+## Troubleshooting
 
-## Paso 9: Instalar Frontend (Opcional)
+### `.venv/bin/activate` does not exist
+
+Environment creation did not finish, often because it was interrupted. Move the incomplete directory and recreate it:
 
 ```bash
-# Navegar a directorio frontend
-cd frontend
-
-# Instalar Node.js 18+ si no lo tienes
-# Ubuntu:
-curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-sudo apt-get install -y nodejs
-
-# Instalar dependencias
-npm install
-
-# Iniciar servidor de desarrollo
-npm run dev
-
-# Deberías ver:
-# ➜  Local:   http://localhost:3000/
+mv .venv .venv-incomplete
+python3.12 -m venv .venv
+source .venv/bin/activate
 ```
 
----
+### Python 3.14 was selected
 
-## Paso 10: Crear el administrador y probar login
+Move the incomplete environment and explicitly invoke Python 3.12. After activation, confirm the result with `python --version`.
 
-1. Abre `http://localhost:8000/docs` (Swagger UI)
-2. Usa `/api/auth/register` con el header `X-Bootstrap-Token` configurado en `.env`.
-3. El endpoint solo permite crear el primer usuario; los siguientes se crean desde `/api/users` por un administrador.
-4. Inicia sesión en `/api/auth/login` con el email y contraseña recién creados.
-5. Deberías recibir tokens JWT de acceso y renovación.
+### `dlib` fails to build
 
----
-
-## Solución de Problemas Comunes
-
-### Error: "No module named 'face_recognition'"
+Confirm that CMake, a C++ compiler, Python development headers, OpenBLAS, and LAPACK are installed. Then retry:
 
 ```bash
-pip install face_recognition --no-cache-dir
+python -m pip install --no-cache-dir dlib
+python -m pip install --no-cache-dir face_recognition
+python -m pip install -r requirements.txt
 ```
 
-### Error: "dlib failed to build"
+### `NoSuchModuleError: sqlite.sqlcipher`
 
-```bash
-# Asegurar dependencias de sistema
-sudo apt install cmake build-essential libboost-python-dev
+The obsolete dialect name is still present in `.env`. Change it to:
 
-# Limpiar cache
-pip cache purge
-
-# Reintentar
-pip install dlib --no-cache-dir
+```env
+DATABASE_URL=sqlite+pysqlcipher:///./secure.db
 ```
 
-### Error: "SQLCipher no disponible"
+### SQLCipher is unavailable
+
+Fedora:
 
 ```bash
-# Instalar SQLCipher
+sudo dnf install sqlcipher sqlcipher-devel
+python -m pip install --force-reinstall --no-cache-dir sqlcipher3
+```
+
+Ubuntu/Debian:
+
+```bash
 sudo apt install libsqlcipher-dev sqlcipher
-
-# Reinstalar sqlcipher3
-pip uninstall sqlcipher3
-pip install sqlcipher3 --no-cache-dir
+python -m pip install --force-reinstall --no-cache-dir sqlcipher3
 ```
 
-### Error: "Cámara no detectada"
+On native Windows, verify the SQLCipher header, library, and DLL paths or switch to WSL2.
+
+### `email-validator is not installed`
+
+The authentication schemas use Pydantic's `EmailStr`:
 
 ```bash
-# Linux: verificar permisos
+python -m pip install email-validator
+```
+
+### Camera is unavailable on Linux
+
+```bash
 ls -l /dev/video*
-sudo usermod -a -G video $USER
-# Reiniciar sesión
-
-# Probar con OpenCV directamente
-python -c "import cv2; cap = cv2.VideoCapture(0); ret, frame = cap.read(); print('Cámara OK:', ret)"
+python -c "import cv2; camera = cv2.VideoCapture(0); ok, _ = camera.read(); print('Camera available:', ok); camera.release()"
 ```
 
-### Error: "JWT decode failed"
-
-Verificar que `SECRET_KEY` en `.env` tenga exactamente 64 caracteres hex.
-
----
-
-## Verificación Final
-
-Ejecuta este script de verificación:
+If access is denied, add the user to the `video` group and sign out and back in:
 
 ```bash
-python scripts/verify_installation.py
+sudo usermod -aG video "$USER"
 ```
 
-**Checklist:**
-- Python 3.10+ instalado
-- Entorno virtual activo
-- Todas las dependencias instaladas
-- Base de datos encriptada creada
-- Usuario admin creado
-- Cámara detectada
-- Servidor inicia sin errores
-- Login funciona con JWT
+Change `CAMERA_INDEX` in `.env` if the desired camera uses another index.
 
----
+### Missing TLS certificate files
 
-## Siguientes Pasos
+For the documented local Uvicorn command, set `TLS_ENABLED=false`. For production, terminate HTTPS at a reverse proxy or provide valid certificate and key files in `.env`.
 
-1. **Cambiar contraseña de admin** inmediatamente
-2. **Configurar HTTPS** para producción
-3. **Enroll de usuarios** desde el dashboard
-4. **Configurar zonas de acceso**
-5. **Probar detección de animales**
-6. **Configurar alertas** (email, webhook)
+## Production notes
 
----
-
-## Soporte
-
-Si tienes problemas:
-1. Revisa los logs en `logs/audit.log`
-2. Verifica el archivo `.env`
-3. Asegúrate de tener el entorno virtual activo
-4. Consulta la documentación en `/docs` del servidor
-
-**Recursos:**
-- [Documentación FastAPI](https://fastapi.tiangolo.com/)
-- [face_recognition docs](https://github.com/ageitgey/face_recognition)
-- [YOLOv8 docs](https://docs.ultralytics.com/)
+The `--reload` server is for development. Before exposing the service, use a production process manager, trusted HTTPS termination, restricted CORS origins, firewall rules, backups, log rotation, and a documented biometric-data retention policy.

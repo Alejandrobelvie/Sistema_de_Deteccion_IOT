@@ -1,4 +1,4 @@
-.env
+.env*
 *.db
 *.db-shm
 *.db-wal
@@ -8,4 +8,5 @@ __pycache__/
 .coverage
 htmlcov/
 logs/
+.venv*
 *.pt
