@@ -195,3 +195,15 @@ class AccessZone(Base):
     # Estado
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class Camera(Base):
+    """Configured cameras; connectivity requires a separate telemetry integration."""
+    __tablename__ = "cameras"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(100), nullable=False)
+    zone = Column(String(100), nullable=False)
+    source = Column(String(500), nullable=False)
+    enabled = Column(Boolean, default=True, nullable=False)
+    detection = Column(String(20), default="both", nullable=False)

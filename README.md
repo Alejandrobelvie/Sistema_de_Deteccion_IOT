@@ -2,7 +2,7 @@
 
 Secure biometric access-control backend built with FastAPI. It provides JWT authentication, encrypted biometric templates, facial recognition, access logs, dashboard metrics, and animal-detection services.
 
-The repository currently contains the Python API only. There is no complete web frontend in this version; use FastAPI's interactive API documentation at `http://127.0.0.1:8000/docs`.
+The Python server also serves a responsive web workspace at `http://127.0.0.1:8000/`. It includes an overview, dashboard meters, camera inventory and configuration, biometric zone permissions, and user administration. No frontend build or Node.js installation is required.
 
 ## Current requirements
 
@@ -55,7 +55,8 @@ python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 
 Open these URLs:
 
-- API status: <http://127.0.0.1:8000/>
+- Web workspace: <http://127.0.0.1:8000/>
+- API status: <http://127.0.0.1:8000/api/status>
 - Health check: <http://127.0.0.1:8000/health>
 - Swagger UI: <http://127.0.0.1:8000/docs>
 - OpenAPI schema: <http://127.0.0.1:8000/openapi.json>
@@ -66,6 +67,14 @@ In Swagger UI, call `POST /api/auth/register`. Supply the value of `BOOTSTRAP_TO
 
 Sign in through `POST /api/auth/login`. Its `username` form field accepts the administrator's email address. Use the returned bearer token with the **Authorize** button in Swagger UI.
 
+## Web workspace
+
+After creating the first administrator, use **Sign in** in the web workspace with the administrator email and password. Authentication is retained for the browser tab in session storage; use the top-right button to sign out. Administrators can create and configure users, register cameras, and edit access permissions for enrolled people. Other authenticated roles can view metrics and camera inventory.
+
+Camera settings persist in the encrypted database. Camera registration does not establish a stream: live video and connection telemetry still need a device integration, so the UI explicitly labels connectivity as unverified. Detection mode and enablement are saved configuration for that future integration. Dashboard values come from recorded access events, with no sample metrics. Blank biometric zone permissions mean all zones, matching the recognition API.
+
+The new camera table is created automatically at startup. Existing tables do not require a migration.
+
 ## Implemented API routes
 
 | Method | Route | Purpose | Access |
@@ -75,6 +84,11 @@ Sign in through `POST /api/auth/login`. Its `username` form field accepts the ad
 | `POST` | `/api/auth/refresh` | Refresh authentication | Refresh token |
 | `GET` | `/api/auth/me` | Return the current user | Authenticated user |
 | `GET`, `POST` | `/api/users` | List or create users | Administrator |
+| `PUT` | `/api/users/{user_id}` | Update user profile, role, and status | Administrator |
+| `GET`, `POST` | `/api/cameras` | List or register cameras | Authenticated read / admin write |
+| `PUT` | `/api/cameras/{camera_id}` | Save camera configuration | Administrator |
+| `GET` | `/api/permissions` | List biometric permissions without templates | Administrator |
+| `PUT` | `/api/permissions/{person_id}` | Update zone permissions and active status | Administrator |
 | `PATCH` | `/api/users/{user_id}/active` | Enable or disable a user | Administrator |
 | `POST` | `/api/access/enroll` | Create a facial template from 3–5 images | Administrator |
 | `POST` | `/api/access/recognize` | Check a face and record the result | Authenticated user |

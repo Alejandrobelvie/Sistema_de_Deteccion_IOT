@@ -4,11 +4,14 @@ Punto de entrada principal de la aplicación FastAPI
 """
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 from contextlib import asynccontextmanager
 import structlog
 
 from app.core.config import settings
-from app.api import auth, users, access, dashboard, logs
+from app.api import auth, users, access, dashboard, logs, management
 from app.db.database import init_db
 from app.db.database import get_db
 from sqlalchemy import text
@@ -72,7 +75,18 @@ app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"]
 app.include_router(logs.router, prefix="/api/logs", tags=["Auditoría"])
 
 
-@app.get("/", tags=["Root"])
+app.include_router(management.router, prefix="/api", tags=["Management"])
+
+WEB_DIR = Path(__file__).resolve().parent / "web"
+app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
+
+
+@app.get("/", include_in_schema=False)
+async def home():
+    return FileResponse(WEB_DIR / "index.html")
+
+
+@app.get("/api/status", tags=["Root"])
 async def root():
     """Endpoint de salud del sistema"""
     return {

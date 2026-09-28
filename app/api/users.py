@@ -66,3 +66,32 @@ def set_user_active(user_id: int, active: bool, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
     return user
+
+
+class UserUpdate(BaseModel):
+    email: EmailStr
+    full_name: str = Field(min_length=1, max_length=255)
+    role: str
+    is_active: bool
+
+
+@router.put("/{user_id}", response_model=UserResponse)
+def update_user(
+    user_id: int, data: UserUpdate,
+    db: Session = Depends(get_db),
+    current: models.User = Depends(require_admin),
+):
+    if data.role not in {"admin", "security", "user"}:
+        raise HTTPException(422, "Invalid role")
+    user = db.get(models.User, user_id)
+    if user is None:
+        raise HTTPException(404, "User not found")
+    if user.id == current.id and (not data.is_active or data.role != "admin"):
+        raise HTTPException(422, "You cannot disable or demote your own administrator account")
+    if db.query(models.User).filter(models.User.email == data.email, models.User.id != user_id).first():
+        raise HTTPException(409, "Email already registered")
+    for key, value in data.model_dump().items():
+        setattr(user, key, value)
+    db.commit()
+    db.refresh(user)
+    return user
