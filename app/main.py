@@ -11,7 +11,7 @@ from contextlib import asynccontextmanager
 import structlog
 
 from app.core.config import settings
-from app.api import auth, users, access, dashboard, logs, management
+from app.api import auth, users, access, dashboard, logs, management, camera_devices
 from app.db.database import init_db
 from app.db.database import get_db
 from sqlalchemy import text
@@ -76,6 +76,7 @@ app.include_router(logs.router, prefix="/api/logs", tags=["Auditoría"])
 
 
 app.include_router(management.router, prefix="/api", tags=["Management"])
+app.include_router(camera_devices.router, prefix="/api/cameras", tags=["Camera devices"])
 
 WEB_DIR = Path(__file__).resolve().parent / "web"
 app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")

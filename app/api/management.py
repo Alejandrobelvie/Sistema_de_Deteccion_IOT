@@ -1,6 +1,6 @@
 """Camera inventory and biometric access permissions."""
 from typing import Literal
-from urllib.parse import urlsplit
+from app.services.camera_devices import validate_source
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, field_validator
@@ -23,16 +23,16 @@ class CameraSettings(BaseModel):
     @field_validator("source")
     @classmethod
     def validate_source(cls, value):
-        parsed = urlsplit(value)
-        if parsed.scheme not in {"rtsp", "https", "http"} or not parsed.hostname:
-            raise ValueError("Use a valid RTSP or HTTP camera URL")
-        if parsed.username or parsed.password:
-            raise ValueError("Do not include credentials in the camera URL")
-        return value
+        return validate_source(value)
 
 
-class CameraResponse(CameraSettings):
+class CameraResponse(BaseModel):
     id: int
+    name: str
+    zone: str
+    source: str
+    enabled: bool
+    detection: str
     model_config = {"from_attributes": True}
 
 
@@ -93,3 +93,12 @@ def update_permissions(person_id: int, data: PermissionSettings, db: Session = D
     db.commit()
     db.refresh(person)
     return person
+
+
+@router.delete('/cameras/{camera_id}', status_code=204, dependencies=[Depends(require_admin)])
+def delete_camera(camera_id: int, db: Session = Depends(get_db)):
+    camera = db.get(Camera, camera_id)
+    if camera is None:
+        raise HTTPException(404, 'Camera not found')
+    db.delete(camera)
+    db.commit()

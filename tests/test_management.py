@@ -7,7 +7,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
-from app.api import management, users
+from app.api import management, users, camera_devices
 from app.api.dependencies import get_current_user
 from app.db.database import Base, get_db
 from app.db.models import User, AuthorizedPerson
@@ -23,6 +23,7 @@ async def workspace():
         db.commit()
         app = FastAPI()
         app.include_router(management.router, prefix='/api')
+        app.include_router(camera_devices.router, prefix='/api/cameras')
         app.include_router(users.router, prefix='/api/users')
         app.dependency_overrides[get_db] = lambda: db
         app.dependency_overrides[get_current_user] = lambda: administrator

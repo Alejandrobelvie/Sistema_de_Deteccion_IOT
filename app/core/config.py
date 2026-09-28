@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite+sqlcipher:///./secure.db"
     
     # Cámara
+    CAMERA_ALLOWED_HOSTS: str = ""  # Explicit trusted IPs for outbound video capture
     CAMERA_INDEX: int = 0
     CAMERA_WIDTH: int = 1280
     CAMERA_HEIGHT: int = 720

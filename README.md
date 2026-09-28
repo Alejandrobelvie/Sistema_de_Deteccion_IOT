@@ -71,7 +71,9 @@ Sign in through `POST /api/auth/login`. Its `username` form field accepts the ad
 
 After creating the first administrator, use **Sign in** in the web workspace with the administrator email and password. Authentication is retained for the browser tab in session storage; use the top-right button to sign out. Administrators can create and configure users, register cameras, and edit access permissions for enrolled people. Other authenticated roles can view metrics and camera inventory.
 
-Camera settings persist in the encrypted database. Camera registration does not establish a stream: live video and connection telemetry still need a device integration, so the UI explicitly labels connectivity as unverified. Detection mode and enablement are saved configuration for that future integration. Dashboard values come from recorded access events, with no sample metrics. Blank biometric zone permissions mean all zones, matching the recognition API.
+Camera settings persist in the encrypted database. Administrators can discover local capture devices and ONVIF network cameras, then request an authenticated snapshot with **Test & preview**. A snapshot proves a frame was received at that moment; it is not continuous connection monitoring. Detection mode remains saved configuration: snapshots and browser previews do not automatically run biometric or animal recognition. Dashboard values come from recorded access events, with no sample metrics. Blank biometric zone permissions mean all zones, matching the recognition API.
+
+See [camera setup](CAMERAS.md) for the laptop camera, Wi-Fi cameras, phone cameras, and connection restrictions.
 
 The new camera table is created automatically at startup. Existing tables do not require a migration.
 
@@ -87,6 +89,9 @@ The new camera table is created automatically at startup. Existing tables do not
 | `PUT` | `/api/users/{user_id}` | Update user profile, role, and status | Administrator |
 | `GET`, `POST` | `/api/cameras` | List or register cameras | Authenticated read / admin write |
 | `PUT` | `/api/cameras/{camera_id}` | Save camera configuration | Administrator |
+| `POST` | `/api/cameras/discovery/{transport}` | Discover usb, network, or connected bluetooth devices | Administrator |
+| `POST` | `/api/cameras/{camera_id}/snapshot` | Capture one JPEG without storing it | Administrator |
+| `DELETE` | `/api/cameras/{camera_id}` | Remove configuration, preserving logs | Administrator |
 | `GET` | `/api/permissions` | List biometric permissions without templates | Administrator |
 | `PUT` | `/api/permissions/{person_id}` | Update zone permissions and active status | Administrator |
 | `PATCH` | `/api/users/{user_id}/active` | Enable or disable a user | Administrator |
