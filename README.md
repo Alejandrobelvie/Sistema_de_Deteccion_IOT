@@ -143,3 +143,10 @@ See [app/INSTALL_GUIDE.md](app/INSTALL_GUIDE.md) for Fedora, Ubuntu/Debian, and 
 - Esteban Ramirez
 - Andy Rodriguez
 - Alejandro Belvie
+
+
+
+## Esteban start app with fedora
+cd /home/estebanramirez/Programacion/IOT/Sistema_de_Deteccion_IOT
+source ../venv/bin/activate
+python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
