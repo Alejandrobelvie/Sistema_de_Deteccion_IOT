@@ -39,7 +39,7 @@ pycryptodome>=3.19.0
 passlib[bcrypt]>=1.7.4
 python-jose[cryptography]>=3.3.0
 PyJWT>=2.8.0
-bcrypt>=4.1.0
+bcrypt>=4.1.0,<5  # Compatible with passlib 1.7.4
 
 # --------------------------------------------
 # Validación y Utilidades

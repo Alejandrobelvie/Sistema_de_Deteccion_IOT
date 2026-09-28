@@ -1,0 +1,17 @@
+Centinela — Test accounts
+Sign in with the email address.
+
+Full name: Esteban Ramirez
+Email: estebanramirez@centinela.cl
+Password: test1234
+Role: user
+
+Full name: Andy Rodriguez
+Email: andyrodriguez@centinela.cl
+Password: test1234
+Role: user
+
+Full name: Alejandro Belvie
+Email: alejandrobelvie@centinela.cl
+Password: test1234
+Role: user
