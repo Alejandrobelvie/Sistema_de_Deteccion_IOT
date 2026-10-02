@@ -4,14 +4,19 @@ Sign in with the email address.
 Full name: Esteban Ramirez
 Email: estebanramirez@centinela.cl
 Password: test1234
-Role: user
+Role: admin
 
 Full name: Andy Rodriguez
 Email: andyrodriguez@centinela.cl
 Password: test1234
-Role: user
+Role: admin
 
 Full name: Alejandro Belvie
 Email: alejandrobelvie@centinela.cl
 Password: test1234
+Role: admin
+
+Full name: Trabajador
+Email: trabajador@centinela.cl
+Password: Trabajador2026!
 Role: user
