@@ -128,3 +128,57 @@ async def recognize(
         "confidence": result["confidence"] if result else None,
         "reason": "granted" if granted else "not_recognized_or_liveness_failed",
     }
+
+
+@router.post("/analyze", dependencies=[Depends(require_admin)])
+async def analyze_faces(
+    image: UploadFile = File(...),
+    zone: str = Form("default"),
+    db: Session = Depends(get_db),
+):
+    """Identify faces for the operator overlay; this does not grant physical access."""
+    frame = await decode_image(image)
+    height, width = frame.shape[:2]
+    locations = face_service.detect_faces(frame)
+    people = db.query(models.AuthorizedPerson).filter(
+        models.AuthorizedPerson.consent_given.is_(True),
+    ).all()
+    known = []
+    for person in people:
+        encoding = face_service.load_biometric_template(person.biometric_template_encrypted)
+        if encoding is not None and encoding.shape == (128,):
+            known.append((person, encoding))
+
+    results = []
+    for location in locations[:20]:
+        encoding = face_service.encode_face(frame, location)
+        matched = None
+        confidence = None
+        if encoding is not None and known:
+            distances = np.array([np.linalg.norm(item[1] - encoding) for item in known])
+            index = int(np.argmin(distances))
+            distance = float(distances[index])
+            if distance < face_service.tolerance:
+                matched = known[index][0]
+                confidence = max(0.0, min(1.0, 1.0 - distance))
+
+        if matched:
+            zones = {item.strip() for item in (matched.authorized_zones or "").split(",") if item.strip()}
+            allowed = bool(matched.is_active and (not zones or zone in zones))
+            status = "allowed" if allowed else "denied"
+            label = matched.full_name
+        else:
+            status, label = "unregistered", "Not registered"
+        top, right, bottom, left = location
+        results.append({
+            "status": status,
+            "label": label,
+            "confidence": confidence,
+            "box": {
+                "top": max(0, min(height, int(top))),
+                "right": max(0, min(width, int(right))),
+                "bottom": max(0, min(height, int(bottom))),
+                "left": max(0, min(width, int(left))),
+            },
+        })
+    return {"width": width, "height": height, "faces": results}

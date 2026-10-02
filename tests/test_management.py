@@ -1,4 +1,5 @@
 """Management workflows use an isolated in-memory database."""
+import numpy as np
 import pytest
 import pytest_asyncio
 from fastapi import FastAPI
@@ -111,3 +112,26 @@ async def test_enrollment_requires_admin_and_consent(workspace):
     administrator.role = 'user'
     data['consent_given'] = 'true'
     assert (await client.post('/api/access/enroll', data=data, files=files)).status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_camera_analysis_marks_allowed_denied_and_unregistered(workspace, monkeypatch):
+    client, db, _ = workspace
+    db.add_all([
+        AuthorizedPerson(employee_id='A1', full_name='Allowed', biometric_template_encrypted='allowed', consent_given=True, authorized_zones='Entrance', is_active=True),
+        AuthorizedPerson(employee_id='D1', full_name='Denied', biometric_template_encrypted='denied', consent_given=True, authorized_zones='Office', is_active=True),
+    ])
+    db.commit()
+
+    async def decoded(_):
+        return np.zeros((100, 100, 3), dtype=np.uint8)
+
+    locations = [(1, 10, 10, 1), (20, 30, 30, 20), (40, 50, 50, 40)]
+    monkeypatch.setattr(access, 'decode_image', decoded)
+    monkeypatch.setattr(access.face_service, 'detect_faces', lambda frame: locations)
+    monkeypatch.setattr(access.face_service, 'load_biometric_template', lambda value: np.zeros(128) if value == 'allowed' else np.full(128, .2))
+    monkeypatch.setattr(access.face_service, 'encode_face', lambda frame, location: np.zeros(128) if location[3] == 1 else np.full(128, .2) if location[3] == 20 else np.ones(128))
+    result = await client.post('/api/access/analyze', data={'zone': 'Entrance'}, files={'image': ('frame.jpg', b'image', 'image/jpeg')})
+    assert result.status_code == 200
+    assert [face['status'] for face in result.json()['faces']] == ['allowed', 'denied', 'unregistered']
+    assert result.json()['faces'][0]['label'] == 'Allowed'
