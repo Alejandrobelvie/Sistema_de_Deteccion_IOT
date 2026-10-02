@@ -6,12 +6,14 @@ from threading import Lock
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import require_admin
 from app.db.database import get_db
 from app.db.models import Camera
 from app.services import camera_devices as devices
+from app.services.camera_stream import camera_stream_hub
 
 router = APIRouter(dependencies=[Depends(require_admin)])
 # Bound simultaneous hardware operations per server worker; captures are never continuous.
@@ -39,6 +41,9 @@ def snapshot(camera_id: int, db: Session = Depends(get_db)):
         source = devices.capture_source(camera.source)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
+    shared_frame = camera_stream_hub.latest(source)
+    if shared_frame:
+        return Response(shared_frame, media_type='image/jpeg', headers={'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff'})
     if not hardware_lock.acquire(blocking=False):
         raise HTTPException(409, 'Another hardware operation is running. Try again shortly.')
     try:
@@ -54,3 +59,20 @@ def snapshot(camera_id: int, db: Session = Depends(get_db)):
         return Response(result.stdout, media_type='image/jpeg', headers={'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff'})
     finally:
         hardware_lock.release()
+
+
+@router.get('/{camera_id}/stream')
+def stream(camera_id: int, db: Session = Depends(get_db)):
+    camera = db.get(Camera, camera_id)
+    if camera is None:
+        raise HTTPException(404, 'Camera not found')
+    if not camera.enabled:
+        raise HTTPException(409, 'Camera is disabled')
+    try:
+        source = devices.capture_source(camera.source)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    return StreamingResponse(
+        camera_stream_hub.stream(source), media_type='application/octet-stream',
+        headers={'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff'},
+    )

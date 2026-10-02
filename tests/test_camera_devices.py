@@ -73,6 +73,11 @@ async def test_discovery_capture_lifecycle(workspace, monkeypatch):
     created = await client.post('/api/cameras', json={'name': 'Laptop', 'zone': 'Office', 'source': '/dev/video0'})
     assert created.status_code == 201
     camera_id = created.json()['id']
+    monkeypatch.setattr(camera_api.camera_stream_hub, 'latest', lambda source: b'\xff\xd8shared-frame')
+    shared = await client.post(f'/api/cameras/{camera_id}/snapshot')
+    assert shared.status_code == 200
+    assert shared.content == b'\xff\xd8shared-frame'
+    monkeypatch.setattr(camera_api.camera_stream_hub, 'latest', lambda source: None)
     monkeypatch.setattr(camera_api.subprocess, 'run', lambda *a, **k: SimpleNamespace(returncode=0, stdout=b'\xff\xd8jpeg-test'))
     response = await client.post(f'/api/cameras/{camera_id}/snapshot')
     assert response.status_code == 200

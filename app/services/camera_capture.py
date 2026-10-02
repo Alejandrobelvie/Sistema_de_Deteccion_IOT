@@ -28,7 +28,8 @@ def capture(source):
         if urlsplit(source).scheme == 'rtsp':
             device = cv2.VideoCapture(source, cv2.CAP_FFMPEG, [cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 3000, cv2.CAP_PROP_READ_TIMEOUT_MSEC, 3000])
         else:
-            device = cv2.VideoCapture(source, cv2.CAP_V4L2)
+            # OpenCV's V4L2 backend expects a numeric index on some Linux builds.
+            device = cv2.VideoCapture(int(source.removeprefix('/dev/video')), cv2.CAP_V4L2)
         try:
             if not device.isOpened():
                 raise ValueError('Camera could not be opened')
