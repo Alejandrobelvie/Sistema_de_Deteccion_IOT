@@ -38,8 +38,20 @@ async def enroll_person(
     authorized_zones: str = Form(""),
     db: Session = Depends(get_db),
 ):
+    employee_id = employee_id.strip()
+    full_name = full_name.strip()
+    department = department.strip() if department else None
+    authorized_zones = authorized_zones.strip()
     if not consent_given:
         raise HTTPException(status_code=422, detail="Se requiere consentimiento biométrico")
+    if not employee_id or len(employee_id) > 50:
+        raise HTTPException(status_code=422, detail="El identificador es obligatorio y admite hasta 50 caracteres")
+    if not full_name or len(full_name) > 255:
+        raise HTTPException(status_code=422, detail="El nombre es obligatorio y admite hasta 255 caracteres")
+    if department and len(department) > 100:
+        raise HTTPException(status_code=422, detail="El departamento admite hasta 100 caracteres")
+    if len(authorized_zones) > 500:
+        raise HTTPException(status_code=422, detail="Las zonas autorizadas admiten hasta 500 caracteres")
     if not 3 <= len(images) <= 5:
         raise HTTPException(status_code=422, detail="Se requieren entre 3 y 5 imágenes")
     if db.query(models.AuthorizedPerson).filter(
@@ -52,8 +64,8 @@ async def enroll_person(
     if template is None:
         raise HTTPException(status_code=422, detail="No se pudo crear una plantilla facial válida")
     person = models.AuthorizedPerson(
-        employee_id=employee_id.strip(),
-        full_name=full_name.strip(),
+        employee_id=employee_id,
+        full_name=full_name,
         department=department,
         authorized_zones=authorized_zones,
         biometric_template_encrypted=face_service.save_biometric_template(template),

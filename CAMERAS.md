@@ -11,6 +11,8 @@ There are two independent options:
 
 Server-side local discovery uses Linux V4L2. The server account needs read/write camera permissions; check `/dev/video*` permissions and the desktop session's device access. A camera already in use by another application can fail to open. Device numbering can change after reconnecting; rediscover and update the source if necessary. Browser capture can also be used on other operating systems.
 
+The Cameras page refreshes the view for each enabled registered camera. Administrators can record that view in the browser, pause or resume it, stop it, play it back, download it, or delete it. These temporary WebM recordings remain only in the current browser session; download a recording before navigating away or refreshing the page if it must be retained. The server does not store these video files.
+
 ## Wi-Fi camera or phone acting as an IP camera
 
 1. Connect the camera/phone and server to the same network. Enable ONVIF discovery on cameras that support it. Guest-network isolation or blocked multicast can prevent discovery.

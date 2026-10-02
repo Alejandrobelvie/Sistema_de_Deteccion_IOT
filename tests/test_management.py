@@ -7,7 +7,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
-from app.api import management, users, camera_devices
+from app.api import access, management, users, camera_devices
 from app.api.dependencies import get_current_user
 from app.db.database import Base, get_db
 from app.db.models import User, AuthorizedPerson
@@ -25,6 +25,7 @@ async def workspace():
         app.include_router(management.router, prefix='/api')
         app.include_router(camera_devices.router, prefix='/api/cameras')
         app.include_router(users.router, prefix='/api/users')
+        app.include_router(access.router, prefix='/api/access')
         app.dependency_overrides[get_db] = lambda: db
         app.dependency_overrides[get_current_user] = lambda: administrator
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
@@ -77,3 +78,36 @@ async def test_admin_cannot_demote_self(workspace):
     client, _, administrator = workspace
     result = await client.put(f'/api/users/{administrator.id}', json=dict(email=administrator.email, full_name='Admin', role='user', is_active=True))
     assert result.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_admin_can_enroll_biometric_profile(workspace, monkeypatch):
+    client, _, _ = workspace
+
+    async def decoded(_):
+        return object()
+
+    monkeypatch.setattr(access, 'decode_image', decoded)
+    monkeypatch.setattr(access.face_service, 'generate_template_from_images', lambda images: object())
+    monkeypatch.setattr(access.face_service, 'save_biometric_template', lambda template: 'encrypted-template')
+    data = {
+        'employee_id': '  EMP-001  ', 'full_name': '  Test Person  ',
+        'department': 'Security', 'authorized_zones': 'Entrance', 'consent_given': 'true',
+    }
+    files = [('images', (f'face-{index}.jpg', b'image', 'image/jpeg')) for index in range(3)]
+    result = await client.post('/api/access/enroll', data=data, files=files)
+    assert result.status_code == 201
+    assert result.json() == {'id': 1, 'employee_id': 'EMP-001', 'full_name': 'Test Person'}
+    duplicate = await client.post('/api/access/enroll', data=data, files=files)
+    assert duplicate.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_enrollment_requires_admin_and_consent(workspace):
+    client, _, administrator = workspace
+    files = [('images', (f'face-{index}.jpg', b'image', 'image/jpeg')) for index in range(3)]
+    data = {'employee_id': 'EMP-002', 'full_name': 'Person', 'consent_given': 'false'}
+    assert (await client.post('/api/access/enroll', data=data, files=files)).status_code == 422
+    administrator.role = 'user'
+    data['consent_given'] = 'true'
+    assert (await client.post('/api/access/enroll', data=data, files=files)).status_code == 403

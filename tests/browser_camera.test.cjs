@@ -24,7 +24,7 @@ function workspace(getUserMedia, enumerateDevices = async()=>[{kind:'videoinput'
     window:{isSecureContext:true,addEventListener(){}},
     navigator:{mediaDevices:{getUserMedia,enumerateDevices}},
     sessionStorage:{getItem:()=>null,removeItem(){},setItem(){}},
-    location:{hash:'#home'},URL:{revokeObjectURL(){}},Intl,Date,setTimeout,
+    location:{hash:'#home'},URL:{revokeObjectURL(){},createObjectURL:()=> 'blob:recording'},Blob,Intl,Date,setTimeout,clearTimeout,
   });
   vm.runInContext(fs.readFileSync(path.join(__dirname,'../app/web/app.js'),'utf8'), context);
   return {context,element,run:code=>vm.runInContext(code,context)};
@@ -81,4 +81,27 @@ test('selecting another camera stops the old stream and requests the selected de
   assert.deepEqual(stopped,['device-1']);
   assert.equal(app.element('#browser-video').srcObject.getVideoTracks()[0].getSettings().deviceId,'device-2');
   assert.match(app.element('#browser-status').textContent,/connected/);
+});
+
+test('registered camera recording can pause, resume, stop, and be deleted',()=>{
+  let stopped=0,revoked=0;
+  class Recorder {
+    static isTypeSupported(){return true;}
+    constructor(stream,options){this.stream=stream;this.mimeType=options.mimeType;this.state='inactive';}
+    start(){this.state='recording';}
+    pause(){this.state='paused';}
+    resume(){this.state='recording';}
+    stop(){this.state='inactive';this.onstop?.();}
+  }
+  const app=workspace(async()=>{}),track={stop(){stopped++;}},stream={getTracks:()=>[track]};
+  app.context.MediaRecorder=Recorder;app.context.window.MediaRecorder=Recorder;
+  app.context.URL.revokeObjectURL=()=>revoked++;
+  const canvas=app.element('[data-feed="7"]');canvas.width=640;canvas.captureStream=()=>stream;
+  app.run('startCameraRecording(7)');
+  assert.equal(app.run('cameraRecordings.get(7).recorder.state'),'recording');
+  app.run('pauseCameraRecording(7)');assert.equal(app.run('cameraRecordings.get(7).recorder.state'),'paused');
+  app.run('pauseCameraRecording(7)');assert.equal(app.run('cameraRecordings.get(7).recorder.state'),'recording');
+  app.run('stopCameraRecording(7)');assert.match(app.element('[data-recording-result="7"]').innerHTML,/Download video/);
+  app.run('deleteCameraRecording(7)');assert.equal(app.run('cameraRecordings.has(7)'),false);
+  assert.equal(stopped,2);assert.equal(revoked,1);
 });
