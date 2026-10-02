@@ -5,7 +5,7 @@ const vm = require('node:vm');
 const fs = require('node:fs');
 const path = require('node:path');
 
-function workspace(getUserMedia) {
+function workspace(getUserMedia, enumerateDevices = async()=>[{kind:'videoinput',deviceId:'device-1',label:'Laptop <camera>'}]) {
   const elements = new Map();
   function element(selector) {
     if (!elements.has(selector)) elements.set(selector, {
@@ -22,7 +22,7 @@ function workspace(getUserMedia) {
   const context = vm.createContext({
     document: {querySelector:element,querySelectorAll:()=>[],addEventListener(){}},
     window:{isSecureContext:true,addEventListener(){}},
-    navigator:{mediaDevices:{getUserMedia,enumerateDevices:async()=>[{kind:'videoinput',deviceId:'device-1',label:'Laptop <camera>'}]}},
+    navigator:{mediaDevices:{getUserMedia,enumerateDevices}},
     sessionStorage:{getItem:()=>null,removeItem(){},setItem(){}},
     location:{hash:'#home'},URL:{revokeObjectURL(){}},Intl,Date,setTimeout,
   });
@@ -60,4 +60,25 @@ test('insecure phone URL displays HTTPS instructions without requesting capture'
   app.run('window.isSecureContext=false; browserCamera()');
   assert.equal(requested,false);
   assert.match(app.element('#browser-status').textContent,/HTTPS/);
+});
+
+test('selecting another camera stops the old stream and requests the selected device',async()=>{
+  const requested=[],stopped=[];
+  const makeStream=id=>{
+    const track={stop(){stopped.push(id);},getSettings:()=>({deviceId:id}),onended:null};
+    return {getTracks:()=>[track],getVideoTracks:()=>[track]};
+  };
+  const app=workspace(async constraints=>{
+    const id=constraints.video.deviceId?.exact||'device-1';requested.push(constraints);return makeStream(id);
+  },async()=>[
+    {kind:'videoinput',deviceId:'device-1',label:'Front camera'},
+    {kind:'videoinput',deviceId:'device-2',label:'Rear camera'},
+  ]);
+  app.run('browserCamera()');await tick();
+  assert.equal(app.element('#browser-device').disabled,false);
+  app.element('#browser-device').onchange({target:{value:'device-2'}});await tick();
+  assert.equal(requested[1].video.deviceId.exact,'device-2');
+  assert.deepEqual(stopped,['device-1']);
+  assert.equal(app.element('#browser-video').srcObject.getVideoTracks()[0].getSettings().deviceId,'device-2');
+  assert.match(app.element('#browser-status').textContent,/connected/);
 });

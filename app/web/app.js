@@ -21,7 +21,12 @@ function empty(title,detail,action=''){return `<div class="empty"><strong>${titl
 function signInPanel(){return `<section class="panel">${empty('Your workspace is ready','Sign in to view live metrics and manage your connected spaces.','<br><button class="button primary" data-action="login">Sign in to workspace ↗</button>')}</section>`;}
 function stats(summary,cameras){return `<div class="stats">${[['Registered cameras',cameras?.length,'Configured devices','▣'],['Authorized people',summary?.authorized_people,'Active biometric profiles','♧'],['Access attempts',summary?.access_attempts_24h,'In the last 24 hours','⇥'],['Open alerts',summary?.unresolved_alerts,'Awaiting review','◇']].map(([label,value,note,icon])=>`<article class="stat"><div class="stat-top">${label}<span class="stat-icon">${icon}</span></div><div class="stat-value">${value ?? '—'}</div><span class="stat-note">${note}</span></article>`).join('')}</div>`;}
 function modules(){return `<div class="section-head"><h2>A little control. A lot of confidence.</h2><span>Your workspace, connected</span></div><div class="modules">${[['cameras','▣','Keep an eye on every space','View your camera inventory and configure detection for each location.','Manage cameras'],['permissions','◇','The right access, for everyone','Manage biometric access and decide who can enter each zone.','Manage permissions'],['users','♧','People at the heart of security','View your team, configure accounts, and manage system roles.','Manage users']].map(([page,icon,title,description,link])=>`<a class="module" href="#${page}"><span class="module-icon">${icon}</span><h3>${title}</h3><p>${description}</p><span class="module-link">${link}<span>↗</span></span></a>`).join('')}</div>`;}
-function clearPreview(){browserRequest++;if(browserStream){browserStream.getTracks().forEach(track=>track.stop());browserStream=null;}if(previewURL){URL.revokeObjectURL(previewURL);previewURL=null;}}
+function stopBrowserStream(){
+ if(!browserStream)return;
+ browserStream.getVideoTracks().forEach(track=>track.onended=null);
+ browserStream.getTracks().forEach(track=>track.stop());browserStream=null;
+}
+function clearPreview(){browserRequest++;stopBrowserStream();if(previewURL){URL.revokeObjectURL(previewURL);previewURL=null;}}
 async function render(){
  clearPreview();if($('#modal').open)$('#modal').close();
  const version=++generation;const page=titles[location.hash.slice(1)] ? location.hash.slice(1) : 'home';
@@ -93,24 +98,24 @@ async function previewCamera(id){
 }
 function browserCamera(){
  clearPreview();$('#dialog-title').textContent='This device’s camera';$('#form-error').textContent='';$('#save-button').hidden=true;
- $('#fields').innerHTML='<p class="sub">Preview the camera on the laptop or phone running this browser. Video stays in this browser and is not recorded or sent to the server. To view a phone camera remotely, configure its Wi-Fi stream under Cameras.</p><p id="browser-status" class="sub" role="status"></p><label for="browser-device">Camera</label><select id="browser-device" aria-label="Select camera"></select><video id="browser-video" class="snapshot" autoplay muted playsinline></video>';
+ $('#fields').innerHTML='<p class="sub">Preview the camera on the laptop or phone running this browser. Video stays in this browser and is not recorded or sent to the server. To view a phone camera remotely, configure its Wi-Fi stream under Cameras.</p><p id="browser-status" class="sub" role="status"></p><label for="browser-device">Camera</label><select id="browser-device" aria-label="Select camera" disabled><option>Detecting cameras…</option></select><video id="browser-video" class="snapshot" autoplay muted playsinline></video>';
  $('#editor').onsubmit=event=>event.preventDefault();$('#modal').showModal();
  $('#browser-device').onchange=event=>startBrowserCamera(event.target.value);startBrowserCamera();
 }
 async function startBrowserCamera(deviceId){
- clearPreview();const request=browserRequest;const status=$('#browser-status');
+ const request=++browserRequest;stopBrowserStream();const status=$('#browser-status'),selector=$('#browser-device');
  if(!window.isSecureContext||!navigator.mediaDevices?.getUserMedia){status.textContent='Browser camera access requires HTTPS, or localhost on this device. Use a trusted HTTPS address when opening this workspace on a phone.';return;}
- status.textContent='Waiting for camera permission…';
+ selector.disabled=true;status.textContent=deviceId?'Switching camera…':'Waiting for camera permission…';
  try{
- const stream=await navigator.mediaDevices.getUserMedia({video:deviceId?{deviceId:{exact:deviceId}}:{facingMode:'environment'},audio:false});
+ const stream=await navigator.mediaDevices.getUserMedia({video:deviceId?{deviceId:{exact:deviceId}}:{facingMode:{ideal:'environment'}},audio:false});
  if(request!==browserRequest||!status.isConnected||!$('#modal').open){stream.getTracks().forEach(track=>track.stop());return;}
  browserStream=stream;const video=$('#browser-video');video.srcObject=stream;await video.play();
  const devices=await navigator.mediaDevices.enumerateDevices();if(request!==browserRequest||!status.isConnected)return;
- const selected=stream.getVideoTracks()[0].getSettings().deviceId;
- $('#browser-device').innerHTML=devices.filter(device=>device.kind==='videoinput').map((device,index)=>'<option value="'+escapeHTML(device.deviceId)+'" '+(device.deviceId===selected?'selected':'')+'>'+escapeHTML(device.label||'Camera '+(index+1))+'</option>').join('');
+ const selected=stream.getVideoTracks()[0].getSettings().deviceId,videoInputs=devices.filter(device=>device.kind==='videoinput');
+ selector.innerHTML=videoInputs.map((device,index)=>'<option value="'+escapeHTML(device.deviceId)+'" '+(device.deviceId===selected?'selected':'')+'>'+escapeHTML(device.label||'Camera '+(index+1))+'</option>').join('');selector.disabled=videoInputs.length<2;
  status.textContent='Camera connected. Close this dialog to stop the camera.';
- stream.getVideoTracks()[0].onended=()=>{if(status.isConnected)status.textContent='Camera disconnected or permission revoked. Close and reopen to reconnect.';};
- }catch(error){if(request===browserRequest&&status.isConnected){clearPreview();status.textContent=error.name==='NotAllowedError'?'Camera permission denied. Allow access in your browser settings and try again.':error.name==='NotFoundError'?'No camera is available on this device.':'Could not open the camera. Close other apps using it and try again.';}}
+ stream.getVideoTracks()[0].onended=()=>{if(request===browserRequest&&status.isConnected)status.textContent='Camera disconnected or permission revoked. Close and reopen to reconnect.';};
+ }catch(error){if(request===browserRequest&&status.isConnected){stopBrowserStream();selector.disabled=false;status.textContent=error.name==='NotAllowedError'?'Camera permission denied. Allow access in your browser settings and try again.':error.name==='NotFoundError'||error.name==='OverconstrainedError'?'The selected camera is no longer available. Choose another camera or reconnect it.':'Could not open the camera. Close other apps using it and try again.';}}
 }
 function removeCamera(id){dialog('Remove camera','<p class="sub">Remove this camera configuration? Existing access logs will be preserved.</p>',()=>api('/cameras/'+id,{method:'DELETE'}),'Remove camera');}
 
