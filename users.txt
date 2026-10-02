@@ -20,3 +20,15 @@ Full name: Trabajador
 Email: trabajador@centinela.cl
 Password: Trabajador2026!
 Role: user
+
+Manual import on Raspberry Pi
+Run these commands from a terminal after copying and configuring .env:
+
+cd ~/Sistema_de_Deteccion_IOT
+source .venv/bin/activate
+python -m app.db.import_users users.txt
+
+The command creates missing accounts and updates existing names, passwords,
+roles, and active status. It can be run more than once without duplicating users.
+For production, replace the test1234 passwords above with unique passwords of
+at least 12 characters before running the import.
