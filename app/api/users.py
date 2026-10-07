@@ -82,14 +82,14 @@ def update_user(
     current: models.User = Depends(require_admin),
 ):
     if data.role not in {"admin", "security", "user"}:
-        raise HTTPException(422, "Invalid role")
+        raise HTTPException(422, "Rol inválido")
     user = db.get(models.User, user_id)
     if user is None:
-        raise HTTPException(404, "User not found")
+        raise HTTPException(404, "Usuario no encontrado")
     if user.id == current.id and (not data.is_active or data.role != "admin"):
-        raise HTTPException(422, "You cannot disable or demote your own administrator account")
+        raise HTTPException(422, "No puedes desactivar ni reducir los permisos de tu propia cuenta de administrador")
     if db.query(models.User).filter(models.User.email == data.email, models.User.id != user_id).first():
-        raise HTTPException(409, "Email already registered")
+        raise HTTPException(409, "El correo electrónico ya está registrado")
     for key, value in data.model_dump().items():
         setattr(user, key, value)
     db.commit()

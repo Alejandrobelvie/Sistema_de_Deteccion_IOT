@@ -22,12 +22,12 @@ def test_reject_unsafe_sources(source):
 
 def test_capture_requires_explicit_allowlist(monkeypatch):
     monkeypatch.setattr(devices.settings, 'CAMERA_ALLOWED_HOSTS', '')
-    with pytest.raises(ValueError, match='not approved'):
+    with pytest.raises(ValueError, match='no está autorizada'):
         devices.capture_source('rtsp://192.168.1.3/live')
     monkeypatch.setattr(devices.settings, 'CAMERA_ALLOWED_HOSTS', '192.168.1.3')
     assert devices.capture_source('rtsp://192.168.1.3/live').startswith('rtsp:')
     monkeypatch.setattr(devices, 'discover_usb', lambda: {'devices': []})
-    with pytest.raises(ValueError, match='disconnected'):
+    with pytest.raises(ValueError, match='desconectada'):
         devices.capture_source('/dev/video0')
 
 
@@ -52,16 +52,22 @@ def test_bluetooth_unavailable_and_timeout(monkeypatch):
     def timeout(*args, **kwargs):
         raise subprocess.TimeoutExpired('bluetoothctl', 4)
     monkeypatch.setattr(devices.subprocess, 'run', timeout)
-    assert 'four seconds' in devices.discover_bluetooth()['message']
+    assert 'cuatro segundos' in devices.discover_bluetooth()['message']
 
 
 @pytest.mark.asyncio
-async def test_discovery_and_snapshot_require_admin(workspace, monkeypatch):
+async def test_regular_user_can_view_cameras_but_not_manage_hardware(workspace, monkeypatch):
     client, _, user = workspace
+    monkeypatch.setattr(devices, 'discover_usb', lambda: {'devices': [{'source': '/dev/video0'}], 'message': 'Encontrada'})
+    created = await client.post('/api/cameras', json={'name': 'Entrada', 'zone': 'Acceso', 'source': '/dev/video0'})
+    camera_id = created.json()['id']
+    monkeypatch.setattr(camera_api.camera_stream_hub, 'latest', lambda source: b'\xff\xd8imagen-compartida')
     user.role = 'user'
     assert (await client.post('/api/cameras/discovery/usb')).status_code == 403
-    assert (await client.post('/api/cameras/1/snapshot')).status_code == 403
-    assert (await client.delete('/api/cameras/1')).status_code == 403
+    snapshot = await client.post(f'/api/cameras/{camera_id}/snapshot')
+    assert snapshot.status_code == 200
+    assert snapshot.content == b'\xff\xd8imagen-compartida'
+    assert (await client.delete(f'/api/cameras/{camera_id}')).status_code == 403
 
 
 @pytest.mark.asyncio

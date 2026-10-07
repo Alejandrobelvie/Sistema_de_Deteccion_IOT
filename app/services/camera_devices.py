@@ -19,21 +19,21 @@ def validate_source(value: str) -> str:
     if re.fullmatch(r'/dev/video[0-9]+', value):
         return value
     if any(ord(c) < 32 for c in value):
-        raise ValueError('Control characters are not permitted')
+        raise ValueError('No se permiten caracteres de control')
     parsed = urlsplit(value)
     if parsed.scheme not in {'rtsp', 'http', 'https'} or not parsed.hostname:
-        raise ValueError('Use /dev/videoN, an RTSP URL, or an HTTP JPEG snapshot URL')
+        raise ValueError('Usa /dev/videoN, una URL RTSP o una URL de captura JPEG por HTTP')
     if parsed.username or parsed.password or parsed.fragment:
-        raise ValueError('Camera URLs must not contain credentials or fragments')
+        raise ValueError('Las URL de cámaras no deben contener credenciales ni fragmentos')
     try:
         address = ipaddress.ip_address(parsed.hostname)
         port = parsed.port
     except ValueError as exc:
-        raise ValueError('Use a literal private camera IP address and a valid port') from exc
+        raise ValueError('Usa una dirección IP privada literal y un puerto válido') from exc
     if not any(address in ipaddress.ip_network(network) for network in ('10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', 'fc00::/7')):
-        raise ValueError('Only private camera IP addresses are accepted')
+        raise ValueError('Solo se aceptan direcciones IP privadas para las cámaras')
     if port == 0:
-        raise ValueError('Invalid port')
+        raise ValueError('Puerto no válido')
     return value
 
 
@@ -41,18 +41,18 @@ def capture_source(source: str) -> str:
     source = validate_source(source)
     if source.startswith('/dev/'):
         if source not in {item['source'] for item in discover_usb()['devices']}:
-            raise ValueError('Camera is disconnected, inaccessible, or not a video capture device')
+            raise ValueError('La cámara está desconectada, no es accesible o no es un dispositivo de captura de video')
     else:
         allowed = {item.strip() for item in settings.CAMERA_ALLOWED_HOSTS.split(',') if item.strip()}
         if urlsplit(source).hostname not in allowed:
-            raise ValueError('Camera IP is not approved. Add it to CAMERA_ALLOWED_HOSTS in the server .env and restart')
+            raise ValueError('La IP de la cámara no está autorizada. Agrégala a CAMERA_ALLOWED_HOSTS en el archivo .env del servidor y reinicia')
     return source
 
 
 def discover_usb() -> dict:
     root = Path('/sys/class/video4linux')
     if not root.exists():
-        return {'devices': [], 'message': 'No Linux video devices found. Check the driver and USB connection.'}
+        return {'devices': [], 'message': 'No se encontraron dispositivos de video en Linux. Revisa el controlador y la conexión USB.'}
     import fcntl
     devices = []
     inaccessible = 0
@@ -90,7 +90,7 @@ def parse_probe(data: bytes, peer: str, message_id: str) -> list[dict]:
                 validate_source(url)
                 scopes = match.findtext('{http://schemas.xmlsoap.org/ws/2005/04/discovery}Scopes') or ''
                 names = [unquote(s.rsplit('/', 1)[-1]) for s in scopes.split() if '/name/' in s]
-                results.append({'name': (names[0] if names else 'ONVIF camera')[:100], 'source': '', 'address': peer, 'service_url': url, 'transport': 'network', 'status': 'discovered', 'can_register': True})
+                results.append({'name': (names[0] if names else 'Cámara ONVIF')[:100], 'source': '', 'address': peer, 'service_url': url, 'transport': 'network', 'status': 'descubierta', 'can_register': True})
                 break
         return results
     except (ElementTree.ParseError, ValueError):
@@ -118,13 +118,13 @@ def discover_network() -> dict:
                 for item in parse_probe(data, peer[0], message_id):
                     devices[item['service_url']] = item
     except OSError:
-        return {'devices': [], 'message': 'Network discovery unavailable. Check multicast permissions and the network interface.'}
-    return {'devices': list(devices.values()), 'message': 'ONVIF discovery on the server network completed. Wi-Fi and Ethernet cameras must have discovery enabled. Enter the vendor RTSP or JPEG URL to capture video.'}
+        return {'devices': [], 'message': 'La búsqueda en red no está disponible. Revisa los permisos de multidifusión y la interfaz de red.'}
+    return {'devices': list(devices.values()), 'message': 'Finalizó la búsqueda ONVIF en la red del servidor. Las cámaras Wi-Fi y Ethernet deben tener activada la detección. Ingresa la URL RTSP o JPEG del fabricante para capturar video.'}
 
 
 def discover_bluetooth() -> dict:
     if not shutil.which('bluetoothctl'):
-        return {'devices': [], 'message': 'BlueZ bluetoothctl is not installed on this server.'}
+        return {'devices': [], 'message': 'BlueZ bluetoothctl no está instalado en este servidor.'}
     try:
         result = subprocess.run(['bluetoothctl', 'devices', 'Connected'], capture_output=True, text=True, timeout=4, check=False)
         devices = []
@@ -132,6 +132,6 @@ def discover_bluetooth() -> dict:
             match = re.fullmatch(r'Device ([0-9A-Fa-f:]{17}) (.+)', line)
             if match:
                 devices.append({'name': match[2][:100], 'address': match[1], 'source': '', 'transport': 'bluetooth', 'status': 'video_driver_required', 'can_register': False})
-        return {'devices': devices, 'message': 'Connected Bluetooth devices only; these are not confirmed cameras. Pair devices in the operating system. Video requires a vendor driver exposing /dev/videoN or a Wi-Fi stream.' if result.returncode == 0 else 'Bluetooth unavailable. Check that the adapter and Bluetooth service are enabled.'}
+        return {'devices': devices, 'message': 'Solo se muestran dispositivos Bluetooth conectados; no se ha confirmado que sean cámaras. Empareja los dispositivos en el sistema operativo. El video requiere un controlador del fabricante que exponga /dev/videoN o una transmisión Wi-Fi.' if result.returncode == 0 else 'Bluetooth no disponible. Comprueba que el adaptador y el servicio Bluetooth estén activados.'}
     except (OSError, subprocess.TimeoutExpired):
-        return {'devices': [], 'message': 'Bluetooth service did not respond within four seconds.'}
+        return {'devices': [], 'message': 'El servicio Bluetooth no respondió en cuatro segundos.'}

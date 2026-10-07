@@ -108,7 +108,7 @@ async def health_check(db: Session = Depends(get_db)):
     try:
         db.execute(text("SELECT 1"))
     except Exception:
-        raise HTTPException(status_code=503, detail="database unavailable")
+        raise HTTPException(status_code=503, detail="Base de datos no disponible")
     return {"status": "ok", "database": "ok"}
 
 

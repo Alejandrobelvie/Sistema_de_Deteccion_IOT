@@ -168,7 +168,7 @@ async def analyze_faces(
             status = "allowed" if allowed else "denied"
             label = matched.full_name
         else:
-            status, label = "unregistered", "Not registered"
+            status, label = "unregistered", "Sin registrar"
         top, right, bottom, left = location
         results.append({
             "status": status,

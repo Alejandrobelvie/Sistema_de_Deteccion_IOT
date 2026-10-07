@@ -54,7 +54,7 @@ def create_camera(data: CameraSettings, db: Session = Depends(get_db)):
 def update_camera(camera_id: int, data: CameraSettings, db: Session = Depends(get_db)):
     camera = db.get(Camera, camera_id)
     if camera is None:
-        raise HTTPException(404, "Camera not found")
+        raise HTTPException(404, "Cámara no encontrada")
     for key, value in data.model_dump().items():
         setattr(camera, key, value)
     db.commit()
@@ -85,9 +85,9 @@ def permissions(db: Session = Depends(get_db)):
 def update_permissions(person_id: int, data: PermissionSettings, db: Session = Depends(get_db)):
     person = db.get(AuthorizedPerson, person_id)
     if person is None:
-        raise HTTPException(404, "Person not found")
+        raise HTTPException(404, "Persona no encontrada")
     if data.is_active and not person.consent_given:
-        raise HTTPException(422, "Biometric consent is required before granting access")
+        raise HTTPException(422, "Se requiere consentimiento biométrico antes de permitir el acceso")
     person.authorized_zones = data.authorized_zones
     person.is_active = data.is_active
     db.commit()
@@ -99,6 +99,6 @@ def update_permissions(person_id: int, data: PermissionSettings, db: Session = D
 def delete_camera(camera_id: int, db: Session = Depends(get_db)):
     camera = db.get(Camera, camera_id)
     if camera is None:
-        raise HTTPException(404, 'Camera not found')
+        raise HTTPException(404, 'Cámara no encontrada')
     db.delete(camera)
     db.commit()

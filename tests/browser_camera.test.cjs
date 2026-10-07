@@ -6,28 +6,29 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 function workspace(getUserMedia, enumerateDevices = async()=>[{kind:'videoinput',deviceId:'device-1',label:'Laptop <camera>'}]) {
-  const elements = new Map();
+  const elements = new Map(),documentEvents={},bodyClasses=new Set();
   function element(selector) {
-    if (!elements.has(selector)) elements.set(selector, {
+    if (!elements.has(selector)) {const classes=new Set();elements.set(selector, {
       textContent: '', innerHTML: '', hidden: false, open: false, isConnected: true,
-      style: {}, events: {}, classList: {toggle() {}},
+      style: {}, events: {}, classList: {toggle() {},add:name=>classes.add(name),remove:name=>classes.delete(name),contains:name=>classes.has(name)},
       setAttribute() {}, removeAttribute() {}, append() {},
       showModal() {this.open = true;},
       close() {this.open = false;this.events.close?.();},
       addEventListener(name, fn) {this.events[name] = fn;},
       play: async () => {},
-    });
+    });}
     return elements.get(selector);
   }
+  const body={classList:{add:name=>bodyClasses.add(name),remove:name=>bodyClasses.delete(name),contains:name=>bodyClasses.has(name)}};
   const context = vm.createContext({
-    document: {querySelector:element,querySelectorAll:()=>[],addEventListener(){}},
+    document: {querySelector:element,querySelectorAll:()=>[],addEventListener:(name,fn)=>documentEvents[name]=fn,body,fullscreenElement:null},
     window:{isSecureContext:true,addEventListener(){}},
     navigator:{mediaDevices:{getUserMedia,enumerateDevices}},
     sessionStorage:{getItem:()=>null,removeItem(){},setItem(){}},
     location:{hash:'#home'},URL:{revokeObjectURL(){},createObjectURL:()=> 'blob:recording'},Blob,Intl,Date,setTimeout,clearTimeout,
   });
   vm.runInContext(fs.readFileSync(path.join(__dirname,'../app/web/app.js'),'utf8'), context);
-  return {context,element,run:code=>vm.runInContext(code,context)};
+  return {context,element,run:code=>vm.runInContext(code,context),trigger:(name,event={})=>documentEvents[name]?.(event)};
 }
 const tick = () => new Promise(resolve=>setImmediate(resolve));
 
@@ -80,7 +81,7 @@ test('selecting another camera stops the old stream and requests the selected de
   assert.equal(requested[1].video.deviceId.exact,'device-2');
   assert.deepEqual(stopped,['device-1']);
   assert.equal(app.element('#browser-video').srcObject.getVideoTracks()[0].getSettings().deviceId,'device-2');
-  assert.match(app.element('#browser-status').textContent,/connected/);
+  assert.match(app.element('#browser-status').textContent,/conectada/);
 });
 
 test('registered camera recording can pause, resume, stop, and be deleted',()=>{
@@ -101,7 +102,18 @@ test('registered camera recording can pause, resume, stop, and be deleted',()=>{
   assert.equal(app.run('cameraRecordings.get(7).recorder.state'),'recording');
   app.run('pauseCameraRecording(7)');assert.equal(app.run('cameraRecordings.get(7).recorder.state'),'paused');
   app.run('pauseCameraRecording(7)');assert.equal(app.run('cameraRecordings.get(7).recorder.state'),'recording');
-  app.run('stopCameraRecording(7)');assert.match(app.element('[data-recording-result="7"]').innerHTML,/Download video/);
+  app.run('stopCameraRecording(7)');assert.match(app.element('[data-recording-result="7"]').innerHTML,/Descargar video/);
   app.run('deleteCameraRecording(7)');assert.equal(app.run('cameraRecordings.has(7)'),false);
   assert.equal(stopped,2);assert.equal(revoked,1);
+});
+
+test('camera preview expands and Escape closes the fallback view',async()=>{
+  const app=workspace(async()=>{}),canvas=app.element('[data-feed="9"]'),preview=app.element('.preview');
+  canvas.parentElement=preview;
+  await app.run('openCameraFullscreen(9)');
+  assert.equal(preview.classList.contains('expanded-preview'),true);
+  assert.equal(app.context.document.body.classList.contains('camera-expanded'),true);
+  app.trigger('keydown',{key:'Escape'});
+  assert.equal(preview.classList.contains('expanded-preview'),false);
+  assert.equal(app.context.document.body.classList.contains('camera-expanded'),false);
 });
