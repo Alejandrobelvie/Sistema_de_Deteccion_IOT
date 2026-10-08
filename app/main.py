@@ -52,7 +52,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Sistema de Control de Acceso Biométrico",
+    title="Visor",
     description="Sistema IoT seguro con reconocimiento facial y detección de animales",
     version="1.0.0",
     lifespan=lifespan,
@@ -92,7 +92,7 @@ async def root():
     """Endpoint de salud del sistema"""
     return {
         "status": "healthy",
-        "system": "Facial Access IoT",
+        "system": "Visor",
         "version": "1.0.0",
         "security": {
             "encryption": "AES-256 (SQLCipher)",

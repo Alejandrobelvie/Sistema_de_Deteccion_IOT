@@ -40,14 +40,14 @@ function clearEnrollmentPhotos(){enrollmentPhotos.forEach(photo=>URL.revokeObjec
 async function render(){
  clearPreview();clearCameraFeeds();if($('#modal').open)$('#modal').close();
  const version=++generation;const page=titles[location.hash.slice(1)] ? location.hash.slice(1) : 'home';
- $('#breadcrumb').textContent=titles[page];document.title=`${titles[page]} · Centinel`;
+ $('#breadcrumb').textContent=titles[page];document.title=`${titles[page]} · Visor`;
  document.querySelectorAll('nav a').forEach(a=>{a.classList.toggle('active',a.dataset.page===page);if(a.dataset.page===page)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');});
  const main=$('#main');main.innerHTML='<div class="loading">Cargando tu espacio…</div>';
  try{
  let content='';
  if(page==='home'||page==='dashboard'){
    const [summary,cameras]=token?await Promise.all([api('/dashboard/summary'),api('/cameras')]):[null,null];
-   content=heading(page==='home'?'Todo a la vista. Todo bajo control.':'Una visión más clara de tu seguridad.',page==='home'?'Te damos la bienvenida a Centinel, una forma más simple de administrar el acceso a tus espacios.':'Métricas de acceso en vivo de las últimas 24 horas.');
+   content=heading(page==='home'?'Todo a la vista. Todo bajo control.':'Una visión más clara de tu seguridad.',page==='home'?'Te damos la bienvenida a Visor, una forma más simple de administrar el acceso a tus espacios.':'Métricas de acceso en vivo de las últimas 24 horas.');
    if(page==='home')content+=`<section class="hero"><div><span class="eyebrow">ESPACIOS CONECTADOS. DECISIONES SEGURAS.</span><h2>La seguridad comienza con<br>una visión completa.</h2><p>Reúne tus cámaras, personas y permisos de acceso en un espacio simple.</p><a class="button" href="#dashboard">Abrir panel <span>↗</span></a></div><div class="radar" aria-hidden="true"><div class="shield">✓</div></div></section>`;
    content+=stats(summary,cameras);
    if(page==='home')content+=modules();
